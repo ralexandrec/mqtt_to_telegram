@@ -210,6 +210,10 @@ class MQTTInterface(StreamInterface):  # pylint:disable=too-many-instance-attrib
         full = json_format.MessageToDict(mqtt_incoming.packet)
         full['channel_id'] = mqtt_incoming.channel_id
         full['gateway_id'] = mqtt_incoming.gateway_id
+        # filter by configured channel — drop messages from other channels
+        configured_channel = self.cfg.MQTT.Channel if self.cfg else None
+        if configured_channel and mqtt_incoming.channel_id and mqtt_incoming.channel_id != configured_channel:
+            return
         # drop our messages or messages without from
         if not full.get('from') or full.get('from', 0) == self.my_hw_int_id:
             return
