@@ -493,5 +493,5 @@ class MeshtasticBot:  # pylint:disable=too-many-instance-attributes
                 self.aprs.send_text(addressee, f'{long_name}: {new_msg}')
 
         self.logger.info("Queued %s: %s", long_name, msg)
-        self.telegram_connection.send_message_sync(chat_id=self.config.enforce_type(int, self.config.Telegram.Room),
-                                              text=f"{long_name}: {msg}")
+        self.telegram_connection.broadcast_sync(f"{long_name}: {msg}",
+                                                room=self.config.enforce_type(int, self.config.Telegram.Room))

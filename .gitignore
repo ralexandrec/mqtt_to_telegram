@@ -147,4 +147,4 @@ Pipfile.*
 external/plugins
 
 #sh scripts
-push*.sh
+push*.shsubscribers.json

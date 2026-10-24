@@ -4,11 +4,15 @@
 
 import asyncio
 import logging
+import os
 import queue
 from typing import Any, Optional
 
 from telegram import Update  # type: ignore[attr-defined]
+from telegram.error import Forbidden, TelegramError
 from telegram.ext import Application
+
+from .subscribers import SubscriberStore
 
 
 class TelegramConnection:
@@ -24,6 +28,11 @@ class TelegramConnection:
         self.running = False
         logging.getLogger("httpx").setLevel(logging.WARNING)
         self.application = Application.builder().token(token).build()
+        self.subscribers = SubscriberStore(
+            os.getenv('TELEGRAM_SUBSCRIBERS_FILE', 'subscribers.json'),
+            logger,
+            os.getenv('TELEGRAM_SUBSCRIBERS', ''),
+        )
 
 
     def send_message_sync(self, *args: Any, **kwargs: Any) -> None:
@@ -31,6 +40,15 @@ class TelegramConnection:
         Send a Telegram message by putting it in the thread-safe queue
         """
         self.q.put((args, kwargs))
+
+    def broadcast_sync(self, text: str, room: Optional[int] = None) -> None:
+        """
+        Send text to the room (if any) and every subscriber, without duplicates
+        """
+        targets = [room] if room else []
+        targets += [x for x in self.subscribers.all() if x != room]
+        for chat_id in targets:
+            self.send_message_sync(chat_id=chat_id, text=text)
 
     def send_message(self, *args: Any, **kwargs: Any) -> None:
         """
@@ -79,6 +97,12 @@ class TelegramConnection:
                 try:
                     await self.application.bot.send_message(*args, **kwargs)
                     self.logger.debug(f"Message sent successfully: {kwargs.get('text', 'photo/document')}")
+                except Forbidden as e:
+                    self.logger.warning(f"Chat {kwargs.get('chat_id')} blocked the bot: {e}")
+                    if kwargs.get('chat_id') is not None:
+                        self.subscribers.remove(kwargs['chat_id'])
+                except TelegramError as e:
+                    self.logger.error(f"Telegram error sending to {kwargs.get('chat_id')}: {e}")
                 except (ValueError, TypeError, RuntimeError) as e:
                     if self.logger:
                         self.logger.error(f"Failed to send message: {e}")

@@ -21,7 +21,7 @@ from telegram import Update
 from telegram.constants import MessageLimit
 from telegram.ext import CallbackContext
 from telegram.ext import CommandHandler
-from telegram.ext import MessageHandler, filters
+from telegram.ext import MessageHandler, TypeHandler, filters
 #
 from mtg.config import Config
 from mtg.connection.rich import RichConnection
@@ -79,6 +79,7 @@ class TelegramBot:  # pylint:disable=too-many-public-methods
 
         application = self.telegram_connection.application
 
+        application.add_handler(TypeHandler(Update, self.register_subscriber), group=-1)
         application.add_handler(CommandHandler('start', self.start))
         application.add_handler(CommandHandler('nodes', self.nodes))
         application.add_handler(CommandHandler('reboot', self.reboot))
@@ -92,6 +93,22 @@ class TelegramBot:  # pylint:disable=too-many-public-methods
         #
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.echo))
 
+
+    async def register_subscriber(self, update: Update, _context: Any) -> None:
+        """
+        Remember every private chat that interacts with the bot, so mesh
+        messages are replicated to it
+        """
+        chat = update.effective_chat
+        if chat is None or chat.type != 'private':
+            return
+        if self.filter is not None and update.effective_user is not None \
+                and self.filter.banned(str(update.effective_user.id)):
+            return
+        if self.telegram_connection.subscribers.add(chat.id):
+            await update.get_bot().send_message(
+                chat_id=chat.id,
+                text="✅ Inscrito! Você vai receber as mensagens do canal Bertioga.")
 
     def set_aprs(self, aprs: Any) -> None:
         """
