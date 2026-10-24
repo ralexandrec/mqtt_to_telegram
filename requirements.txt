@@ -14,7 +14,7 @@ python-telegram-bot==22.5
 pytest==8.4.2
 pytest-cov==7.0.0
 pytest-asyncio==1.2.0
-Pypubsub~=4.0.3
+Pypubsub~=4.0.7
 PyQRCode~=1.2.1
 pony~=0.7.19
 pytz==2025.2
