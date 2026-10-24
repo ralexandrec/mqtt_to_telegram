@@ -124,13 +124,14 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+updates.json
 
 # Pyre type checker
 .pyre/
 
 # local
 logfile*
-mesh.ini
+# mesh.ini
 meshtastic.sqlite
 meshtastic.sqlite.bkp
 meshtastic.sqlite-journal
@@ -144,3 +145,6 @@ Pipfile.*
 
 # Private user plugins, not distributed as part of the bot source code
 external/plugins
+
+#sh scripts
+push*.sh
