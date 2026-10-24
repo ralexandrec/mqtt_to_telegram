@@ -2,7 +2,7 @@ anyio==4.11.0
 aprslib==0.7.2
 cryptography==46.0.3
 flask~=3.1.2
-getmac==0.9.5
+getmac==0.9.6
 haversine~=2.9.0
 humanize
 meshtastic
