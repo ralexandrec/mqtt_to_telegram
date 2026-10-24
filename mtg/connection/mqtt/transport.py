@@ -304,6 +304,9 @@ class MQTTInterface(StreamInterface):  # pylint:disable=too-many-instance-attrib
         mesh_packet.id = packet_id
         mesh_packet.to = packet_to
         mesh_packet.hop_limit = hop_limit
+        # Firmware 2.x needs hop_start (otherwise hops-away math breaks and
+        # the radio may discard the downlink packet)
+        mesh_packet.hop_start = hop_limit
         setattr(mesh_packet, "from", self.my_hw_int_id)
 
         if is_encrypted:
@@ -373,35 +376,21 @@ class MQTTInterface(StreamInterface):  # pylint:disable=too-many-instance-attrib
         if self.logger:
             self.logger.info(f"Sending data to {destination_id} with portNum {port_num} and message {msg!r}")
 
-        # Create both encrypted and unencrypted packets for backwards compatibility
-        hop_limit = 5
+        # Only encrypted packets: the /c/ plaintext copy leaked the private
+        # channel content and the radio does not accept it anyway
+        hop_limit = 3
         encrypted_msg = self.create_encrypted_packet(packet_to, msg, port_num, hop_limit)
-        unencrypted_msg = self.create_packet(packet_to, msg, port_num, hop_limit)
-        Thread(target=self.send_mqtt_message, args=(encrypted_msg, unencrypted_msg), daemon=True).start()
+        Thread(target=self.send_mqtt_message, args=(encrypted_msg,), daemon=True).start()
 
-    def send_mqtt_message(self, encrypted_msg: Any, unencrypted_msg: Any) -> None:
+    def send_mqtt_message(self, encrypted_msg: Any, _unused: Any = None) -> None:
         """
-        sendMQTTMessage - deliver message over MQTT. With retries.
-        Sends to both /e/ (encrypted) and /c/ (unencrypted) for backwards compatibility
+        sendMQTTMessage - deliver encrypted message over MQTT (/e/ topic)
         """
         if self.cfg:
-            # Send encrypted message to /e/ topic
             encrypted_topic = f"{self.cfg.MQTT.Topic}/2/e/{self.cfg.MQTT.Channel}/{self.my_hw_hex_id}"
-            unencrypted_topic = f"{self.cfg.MQTT.Topic}/2/c/{self.cfg.MQTT.Channel}/{self.my_hw_hex_id}"
-
-            for _ in range(3):
-                # Send encrypted message (raw bytes)
-                result_e = self.client.publish(encrypted_topic, encrypted_msg)
-                if self.logger:
-                    self.logger.info(f"MQTT encrypted message sent to {encrypted_topic} with result: {result_e}")
-
-                # Send unencrypted message (serialized protobuf)
-                result_c = self.client.publish(unencrypted_topic, unencrypted_msg.SerializeToString())
-                if self.logger:
-                    self.logger.info(f"MQTT unencrypted message sent to {unencrypted_topic} with result: {result_c}")
-
-            # Sleep time for LongFast
-            time.sleep(30)
+            result_e = self.client.publish(encrypted_topic, encrypted_msg)
+            if self.logger:
+                self.logger.info(f"MQTT encrypted message sent to {encrypted_topic} with result: {result_e}")
 
     def waitForConfig(self) -> None:
         """Wait for configuration"""
