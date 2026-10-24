@@ -48,6 +48,7 @@ FIFOEnabled = false
 WelcomeMessage = Welcome to our community
 WelcomeMessageEnabled = false
 MaxHopCount = 5
+EncryptionKey = ${MESHTASTIC_ENCRYPTION_KEY}
 
 [APRS]
 Enabled = false

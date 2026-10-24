@@ -142,8 +142,16 @@ class MQTTInterface(StreamInterface):  # pylint:disable=too-many-instance-attrib
         self.common.set_client(self.client)
         self.common.set_logger(logger)
         self.common.set_config(cfg)
-        # Crypto class
-        self.crypto = MQTTCrypto()
+        # Crypto class — use channel encryption key from config (base64 → hex)
+        key_hex = None
+        if self.cfg:
+            try:
+                key_b64 = self.cfg.Meshtastic.EncryptionKey
+                if key_b64 and key_b64.strip() not in ('', '""'):
+                    key_hex = base64.b64decode(key_b64.strip()).hex()
+            except Exception:  # pylint:disable=broad-exception-caught
+                pass
+        self.crypto = MQTTCrypto(key_hex)
         #
         StreamInterface.__init__(
             self, debugOut=debugOut, noProto=noProto, connectNow=connectNow
