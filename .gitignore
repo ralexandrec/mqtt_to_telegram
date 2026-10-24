@@ -131,7 +131,7 @@ updates.json
 
 # local
 logfile*
-# mesh.ini
+mesh.ini
 meshtastic.sqlite
 meshtastic.sqlite.bkp
 meshtastic.sqlite-journal
