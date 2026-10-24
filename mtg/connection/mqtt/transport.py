@@ -318,8 +318,10 @@ class MQTTInterface(StreamInterface):  # pylint:disable=too-many-instance-attrib
                 self.my_hw_int_id,
                 packet_id
             )
-            # Set channel hash for encrypted packets
-            mesh_packet.channel = self.crypto.generate_channel_hash(channel_name, str(self.crypto.key))
+            # Set channel hash for encrypted packets — key must be base64 string
+            mesh_packet.channel = self.crypto.generate_channel_hash(
+                channel_name, base64.b64encode(self.crypto.key).decode('utf-8')
+            )
         else:
             # For unencrypted packets, set the decoded field directly
             mesh_packet.rx_time = int(time.time())
