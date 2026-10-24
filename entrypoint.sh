@@ -1,11 +1,7 @@
 #!/bin/sh
-# Injeta o $PORT do Render no mesh.ini
-LISTEN_PORT=${PORT:-5000}
-sed -i "s/^Port = .*/Port = ${LISTEN_PORT}/" /app/mesh.ini
-
-# Inicia servidor HTTP de health check em background
+# Inicia servidor HTTP de status na porta $PORT (requerido pelo Render)
 python3 -c "
-import http.server, os, threading
+import http.server, os
 
 port = int(os.environ.get('PORT', 5000))
 
@@ -59,11 +55,11 @@ HTML = '''<!DOCTYPE html>
 </head>
 <body>
   <div class=\"card\">
-    <h1>🛰️ Bertioga Gateway</h1>
+    <h1>Bertioga Gateway</h1>
     <p class=\"status\"><span class=\"dot\"></span>Online &amp; Running</p>
     <p class=\"info\">
-      Meshtastic ↔ Telegram Bridge<br>
-      MQTT: platform.meshbrasil.com<br>
+      Meshtastic MQTT Bridge<br>
+      MQTT: platform.meshbrasil.com:1883<br>
       Canal: Bertioga
     </p>
     <span class=\"badge\">mqtt_to_telegram v1.0</span>
