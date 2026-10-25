@@ -168,10 +168,11 @@ class TelegramBot:  # pylint:disable=too-many-public-methods
         :param _:
         :return:
         """
-        if update.effective_chat.id != self.config.enforce_type(int, self.config.Telegram.Room):
-            self.logger.debug("%d %s",
-                                  update.effective_chat.id,
-                                  self.config.enforce_type(int, self.config.Telegram.Room))
+        room_id = self.config.enforce_type(int, self.config.Telegram.Room)
+        chat = update.effective_chat
+        is_subscriber = chat.type == 'private' and chat.id in self.telegram_connection.subscribers.all()
+        if chat.id != room_id and not is_subscriber:
+            self.logger.debug("%d %s", chat.id, room_id)
             return
         if self.filter is not None and self.filter.banned(str(update.effective_user.id)):
             self.logger.debug("User %s is in a blacklist...", update.effective_user.id)
@@ -231,6 +232,10 @@ class TelegramBot:  # pylint:disable=too-many-public-methods
             if self.aprs is not None:
                 self.aprs.send_text(addressee, f'{full_user}: {msg}')
         self.meshtastic_connection.send_text(f"{full_user}: {message}")
+        # relay to every other subscriber/room so the bot behaves like a channel
+        for target in dict.fromkeys([room_id] + self.telegram_connection.subscribers.all()):
+            if target != chat.id:
+                self.telegram_connection.send_message_sync(chat_id=target, text=f"{full_user}: {message}")
 
     def shorten_tly(self, long_url: str) -> str:
         """
