@@ -6,7 +6,7 @@ import json
 import random
 import struct
 import time
-from threading import Thread
+from threading import Lock, Thread
 from typing import Any, Dict, Optional
 
 from cryptography.hazmat.primitives.ciphers import (
@@ -24,6 +24,29 @@ from meshtastic.stream_interface import StreamInterface
 from .common import CommonMQTT
 
 random.seed()
+
+
+class SeenPackets:
+    """ TTL cache of (from, packet_id) used to drop copies relayed by several gateways """
+    def __init__(self, ttl: float = 600.0) -> None:
+        self.ttl = ttl
+        self._seen: Dict[tuple, float] = {}
+        self._lock = Lock()
+
+    def check_and_add(self, from_id: int, packet_id: int) -> bool:
+        """
+        Returns True if the packet was already seen within the TTL, otherwise records it and returns False
+        """
+        now = time.monotonic()
+        key = (from_id, packet_id)
+        with self._lock:
+            # purge expired entries
+            for k in [k for k, ts in self._seen.items() if now - ts > self.ttl]:
+                del self._seen[k]
+            if key in self._seen:
+                return True
+            self._seen[key] = now
+            return False
 
 class MQTTCrypto:
     """ MQTT Crypto module """
@@ -225,6 +248,15 @@ class MQTTInterface(StreamInterface):  # pylint:disable=too-many-instance-attrib
         # drop our messages or messages without from
         if not full.get('from') or full.get('from', 0) == self.my_hw_int_id:
             return
+        # drop duplicate copies of the same packet relayed by other gateways
+        if full.get('id'):
+            if not hasattr(self, 'seen_packets'):
+                self.seen_packets = SeenPackets()
+            if self.seen_packets.check_and_add(int(full['from']), int(full['id'])):
+                if self.logger:
+                    self.logger.debug("Duplicate packet %s from %s via %s, dropping",
+                                      full['id'], full['from'], mqtt_incoming.gateway_id)
+                return
         # process encrypted messages
         if full.get('encrypted'):
             full['decoded'] = json_format.MessageToDict(self.crypto.decrypt_packet(full))
