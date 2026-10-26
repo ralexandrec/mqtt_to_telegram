@@ -2,6 +2,7 @@
 """ Meshtastic bot module """
 
 import logging
+import os
 import re
 import time
 from typing import Any, Dict, Optional
@@ -29,6 +30,8 @@ from mtg.log import VERSION
 from mtg.output.file import CSVFileWriter
 from mtg.utils import Memcache
 
+from .node_names import NodeNameStore, normalize_node_id
+
 
 class MeshtasticBot:  # pylint:disable=too-many-instance-attributes
     """
@@ -55,6 +58,12 @@ class MeshtasticBot:  # pylint:disable=too-many-instance-attributes
         # cache
         self.memcache = Memcache(self.logger)
         self.memcache.run_noblock()
+        # node id -> name, learned from NODEINFO and persisted to JSON
+        self.node_names = NodeNameStore(
+            os.getenv('NODE_NAMES_FILE', 'node_names.json'),
+            self.logger,
+            os.getenv('NODE_NAMES', ''),
+        )
 
     def set_aprs(self, aprs: Any) -> None:
         """
@@ -384,13 +393,12 @@ class MeshtasticBot:  # pylint:disable=too-many-instance-attributes
         self.logger.debug("Received: %s", packet)
         to_id = packet.get('toId')
         decoded = packet.get('decoded')
-        from_id = str(packet.get('fromId', ''))
-        # from fix
-        if from_id is None:
-            from_id = hex(packet.get('from')).replace('0x', '')
-            # pad nodes without a zero and prepend exclamation point
-            from_id = f"!{from_id:>08}"
+        from_id = packet.get('fromId')
+        # from fix: fromId is None when the node is not yet in the interface node DB
+        if not from_id and packet.get('from') is not None:
+            from_id = normalize_node_id(packet.get('from'))
             packet['fromId'] = from_id
+        from_id = str(from_id or '')
         # check for blacklist
         if self.filter is not None and self.filter.banned(from_id):
             self.logger.debug("User %s is in a blacklist...", from_id)
@@ -422,6 +430,11 @@ class MeshtasticBot:  # pylint:disable=too-many-instance-attributes
             if decoded is not None and decoded.get('portnum') == 'REPLY_APP':
                 self.process_pong(packet)
                 return
+            # learn node names (id -> name) from NODEINFO packets
+            if decoded.get('portnum') == 'NODEINFO_APP':
+                user = decoded.get('user') or {}
+                self.node_names.learn(packet.get('from', from_id), user.get('longName'), user.get('shortName'))
+                return
             return
         # get msg
         msg = decoded.get('text', '') if decoded is not None else ''
@@ -444,15 +457,19 @@ class MeshtasticBot:  # pylint:disable=too-many-instance-attributes
         except Exception as exc:  # pylint:disable=broad-except
             self.logger.error('Could not store message: %s %s', exc, repr(exc))
         # Process commands and forward messages
-        node_info = interface.nodes.get(from_id)
-        long_name = from_id
-        if node_info is not None:
-            user_info = node_info.get('user')
-            long_name = user_info.get('longName')
-        else:  # get from DB
+        node_info = interface.nodes.get(from_id) if interface.nodes else None
+        user_info = (node_info or {}).get('user') or {}
+        long_name = user_info.get('longName')
+        if long_name:
+            # keep JSON store up to date with what the interface already knows
+            self.node_names.learn(from_id, long_name, user_info.get('shortName'))
+        else:
+            long_name = self.node_names.get(from_id)
+        if not long_name:  # get from DB
             found, record = self.database.get_node_record(from_id)
-            if found:
+            if found and record.nodeName:
                 long_name = record.nodeName
+        long_name = long_name or from_id
         # skip commands
         if msg.startswith('/'):
             self.process_meshtastic_command(packet, interface)

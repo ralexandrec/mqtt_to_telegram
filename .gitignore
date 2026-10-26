@@ -147,4 +147,8 @@ Pipfile.*
 external/plugins
 
 #sh scripts
-push*.shsubscribers.json
+push*.sh
+subscribers.json
+# local ops notes (not versioned)
+*.local.md
+node_names.json
