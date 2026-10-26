@@ -241,6 +241,7 @@ class MQTTInterface(StreamInterface):  # pylint:disable=too-many-instance-attrib
             'id': full.get('id', 0),
             'rxTime': full.get('rxTime', int(time.time())),
             'hopLimit': full.get('hopLimit', 3),
+            'hopStart': full.get('hopStart', 0),
             'viaMqtt': True,
         }
 

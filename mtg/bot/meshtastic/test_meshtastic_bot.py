@@ -412,7 +412,8 @@ class TestMeshtasticBot:
         packet = {
             'fromId': '!12345678',
             'toId': '^all',
-            'hopLimit': 5,
+            'hopStart': 7,
+            'hopLimit': 2,
             'decoded': {'portnum': 'TEXT_MESSAGE_APP', 'text': 'test'}
         }
         mock_interface = MagicMock()
@@ -423,8 +424,8 @@ class TestMeshtasticBot:
         with patch.object(meshtastic_bot, 'config', mock_config):
             meshtastic_bot.on_receive(packet, mock_interface)
 
-        # Should call debug twice (once for receive, once for hop limit)
-        assert meshtastic_bot.logger.debug.call_count == 2
+        # 5 hops travelled > 3 -> dropped with an info log
+        meshtastic_bot.logger.info.assert_called_once()
 
     def test_on_receive_position_message(self, meshtastic_bot, mock_database, mock_config):
         """Test on_receive with position message"""
