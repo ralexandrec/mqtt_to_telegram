@@ -17,7 +17,7 @@ pytest-asyncio==1.2.0
 Pypubsub~=4.0.3
 PyQRCode~=1.2.1
 pony~=0.7.19
-pytz==2025.2
+pytz==2026.5
 reverse-geocoder==1.5.1
 requests~=2.32.3
 sentry-sdk==2.43.0
